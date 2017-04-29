@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Handmade Hero Search</title>
+<script src="https://unpkg.com/react@15.5.4/dist/react.js"></script>
+<script src="https://unpkg.com/react-dom@15.5.4/dist/react-dom.js"></script>
+<script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
+<style>
+    body {
+        background-color: #222;
+        font-family: sans-serif;
+        color: #ddd;
+        overflow-y: scroll;
+    }
+
+    h2 {
+        text-align: center;
+    }
+
+    #loadingContainer {
+        position: fixed;
+        top: 0;
+        left: 0;
+    }
+
+    .queryContainer {
+        width: 1000px;
+        margin: 15px auto;
+        display: flex;
+        flex-direction: horizontal;
+    }
+
+    .queryContainer label {
+        flex-grow: 0;
+        flex-shrink: 0;
+    }
+
+    #query {
+        flex-grow: 1;
+    }
+
+    .results {
+        width: 800px;
+        margin: 0 auto;
+    }
+
+    .dayContainer {
+        background-color: #161616;
+    }
+
+    .dayContainer:nth-child(2n) {
+        background-color: #303030;
+    }
+
+    .dayName {
+        width: 200px;
+        display: inline-block;
+        vertical-align: top;
+        color: #8A877D;
+        font-size: 12px;
+        line-height: 16px;
+        box-sizing: border-box;
+        padding: 5px;
+    }
+
+    .markerList {
+        display: inline-block;
+        width: 600px;
+        box-sizing: border-box;
+        vertical-align: top;
+    }
+
+    .marker {
+        padding: 10px 5px;
+        cursor: pointer;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        display: block;
+        text-decoration: none;
+        color: #ddd;
+    }
+
+    .marker:first-child {
+        border: none;
+    }
+
+    .marker b {
+        color: black;
+        background-color: rgb(255, 155, 0);
+    }
+
+    .marker:hover {
+        background-color: #444;
+    }
+
+    .summary {
+        text-align: center;
+        margin: 10px 0;
+    }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+class App extends React.Component {
+    constructor(props) {
+        super(props);
+        this.handleQuery = this.handleQuery.bind(this);
+        this.state = {
+            query: ''
+        };
+    }
+
+    handleQuery(e) {
+        var queryStr = e.target.value;
+        this.setState(function(prevState) {
+            return {
+                query: queryStr
+            };
+        });
+        location.hash = encodeURIComponent(queryStr);
+    }
+
+    runSearch() {
+        var queryStr = this.state.query;
+        var results = [];
+        if (queryStr && queryStr.length > 0) {
+            var query = new RegExp(queryStr.replace("(", "\\(").replace(")", "\\)").replace(/(^|[^\\])\\$/, "$1"), "gi");
+            for (var i = 0; i < this.props.episodes.length; ++i) {
+                var episode = this.props.episodes[i];
+                var markers = [];
+                for (var j = 0; j < episode.markers.length; ++j) {
+                    query.lastIndex = 0;
+                    var result = query.exec(episode.markers[j].text);
+                    if (result && result[0].length > 0) {
+                        markers.push(episode.markers[j]);
+                    }
+                }
+                if (markers.length > 0) {
+                    results.push({
+                        query: query,
+                        episode: episode,
+                        markers: markers
+                    });
+                }
+            }
+        }
+
+        return results;
+    }
+
+    render() {
+        var searchResults = this.runSearch();
+        return (
+            <div className="subroot">
+                {(this.props.numFilesToLoad == 0 || this.props.numFilesToLoad > this.props.numFilesLoaded) &&
+                    <ContentLoader numFilesToLoad={this.props.numFilesToLoad} numFilesLoaded={this.props.numFilesLoaded} />
+                }
+                <h2>Handmade Hero Annotations Search (with React)</h2>
+                <div className="queryContainer">
+                    <label>Query:</label> <input type="text" id="query" autoFocus onChange={this.handleQuery}></input>
+                </div>
+                <SearchResults results={searchResults} />
+            </div>
+        );
+    }
+}
+
+class ContentLoader extends React.Component {
+    constructor(props) {
+        super(props);
+    }
+
+    render() {
+        return (
+            <div id="loadingContainer">
+                <span>Loading annotations: </span>
+                <span id="loadingProgress">{this.props.numFilesToLoad == 0 ? "Getting list of files..." : this.props.numFilesLoaded + "/" + this.props.numFilesToLoad}</span>
+                <br />
+                <span>You can start typing. Results will stream in as soon as they are available.</span>
+            </div>
+        );
+    }
+}
+
+class SearchResults extends React.Component {
+    constructor(props) {
+        super(props);
+    }
+
+    render() {
+        var numMarkers = 0;
+        var duration = 0;
+        for (var i = 0; i < this.props.results.length; ++i) {
+            numMarkers += this.props.results[i].markers.length;
+            for (var j = 0; j < this.props.results[i].markers.length; ++j) {
+                if (this.props.results[i].markers[j].duration) {
+                    duration += this.props.results[i].markers[j].duration;
+                }
+            }
+        }
+        var totalTime = Math.floor(duration/60/60) + "h " + Math.floor(duration/60)%60 + "m " + duration%60 + "s ";
+        return (
+            <div className="results">
+                <div className="summary">
+                    Found: {this.props.results.length} episodes, {numMarkers} markers, {totalTime} total.
+                </div>
+                <div>
+                    {this.props.results.map((result) =>
+                        <Result key={result.episode.day} result={result} />
+                    )}
+                </div>
+            </div>
+        );
+    }
+}
+
+class Result extends React.Component {
+    constructor(props) {
+        super(props);
+    }
+
+    render() {
+        function markerContent(query, marker) {
+            var content = [];
+            query.lastIndex = 0;
+            var cursor = 0;
+            var text = marker.text;
+            var result = null;
+            content.push(marker.prettyTime + " ");
+            while (result = query.exec(text)) {
+                if (result.index > cursor) {
+                    content.push(text.slice(cursor, result.index));
+                }
+                content.push(<b>{result[0]}</b>);
+                cursor = result.index + result[0].length;
+            }
+
+            if (cursor < text.length) {
+                content.push(text.slice(cursor, text.length));
+            }
+            return content;
+        }
+        return (
+            <div className="dayContainer">
+                <span className="dayName">{this.props.result.episode.day}: {this.props.result.episode.title}</span>
+                <div className="markerList">
+                    {this.props.result.markers.map((marker) =>
+                        <a key={this.props.result.episode.day + marker.totalTime} className="marker" target="_blank" href={"http://asafgartner.github.io/annotations_player/hmh.html#" + this.props.result.episode.filename + "#" + marker.totalTime}>
+                            {markerContent(this.props.result.query, marker)}
+                        </a>
+                    )}
+                </div>
+            </div>
+        );
+    }
+}
+
+var fileListsToLoad = 3;
+var fileListsLoaded = 0;
+var fileList = [];
+var itemsToLoad = 0;
+var itemsLoaded = 0;
+var episodes = [];
+var lastEpisodeIdxLoaded = 0;
+
+function rerender() {
+    ReactDOM.render(
+        <App numFilesToLoad={itemsToLoad} numFilesLoaded={itemsLoaded} episodes={episodes}/>,
+        document.getElementById('root')
+    );
+}
+
+rerender();
+
+function getEpisodeName(filename) {
+    // NOTE(agartner): Expected filename with extension
+    var day = filename.slice(0, filename.indexOf("."));
+    var dayParts = day.match(/([a-zA-Z_-]+)([0-9]+)?([a-zA-Z]+)?/);
+    day = dayParts[1].slice(0, 1).toUpperCase() + dayParts[1].slice(1) + (dayParts[2] ? " " + dayParts[2] : "") + (dayParts[3] ? " " + dayParts[3].toUpperCase() : "");
+    return day;
+}
+
+function markerTime(totalTime) {
+    var markTime = "(";
+    var hours = Math.floor(totalTime / 60 / 60);
+    var minutes = Math.floor(totalTime / 60) % 60;
+    var seconds = totalTime % 60;
+    if (hours > 0) {
+        markTime += padTimeComponent(hours) + ":";
+    }
+
+    markTime += padTimeComponent(minutes) + ":" + padTimeComponent(seconds) + ")";
+
+    return markTime;
+}
+
+function padTimeComponent(component) {
+    return (component < 10 ? "0" + component : component);
+}
+
+function sortDays(dayA, dayB) {
+    return dayB.localeCompare(dayA);
+}
+
+function fileListLoaded(data) {
+    fileListsLoaded++;
+    var files = [];
+    for (var i = data.data.length-1; i >= 0; --i) {
+        var file = data.data[i];
+        files.push({
+            name: file.name,
+            day: getEpisodeName(file.name),
+            path: "https://raw.githubusercontent.com/HandmadeCompanion/HandmadeCompanion/master/" + file.path,
+            data: null
+        });
+    }
+    fileList = fileList.concat(files);
+    if (fileListsLoaded == fileListsToLoad) {
+        itemsToLoad = fileList.length;
+        fileList = fileList.sort(function(a, b) {
+            return sortDays(a.day, b.day);
+        });
+        rerender();
+        for (var i = 0; i < fileList.length; ++i) {
+            addFile(fileList[i].name, fileList[i].path, i);
+        }
+    }
+}
+
+function episodeFileLoaded(name, filepath, idx, contents) {
+    var lines = contents.split("\n");
+    var title = null;
+    var videoId = null;
+    var markers = [];
+    var day = getEpisodeName(name);
+    var mode = "none";
+    for (var i = 0; i < lines.length; ++i) {
+        var line = lines[i];
+        if (line == "---") {
+            mode = "none";
+        } else if (line.startsWith("title:")) {
+            title = line.slice(7).replace(/"/g, "");
+        } else if (line.startsWith("videoId:")) {
+            videoId = line.slice(9).replace(/"/g, "");
+        } else if (line.startsWith("markers")) {
+            mode = "markers";
+        } else if (mode == "markers") {
+            var match = line.match(/"((\d+):)?(\d+):(\d+)": "(.+)"/);
+            if (match == null) {
+                console.log(name, line);
+            } else {
+                var totalTime = (match[2] ? parseInt(match[2], 10) : 0) * 60 * 60 + parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
+                var marker = {
+                    idx: markers.length,
+                    totalTime: totalTime,
+                    prettyTime: markerTime(totalTime),
+                    text: match[5].replace(/\\"/g, "\"")
+                }
+                markers.push(marker);
+            }
+        }
+    }
+
+    for (var i = 0; i < markers.length - 1; ++i) {
+        markers[i].duration = markers[i+1].totalTime - markers[i].totalTime;
+    }
+    fileList[idx].data = {
+        day: day,
+        title: title,
+        videoId: videoId,
+        markers: markers,
+        filename: name.slice(0, name.indexOf(".")),
+        filepath: filepath
+    };
+
+    dataAtIdxReady(idx);
+}
+
+function episodeFileFailed(name, filepath, idx) {
+    fileList[idx].data = "failed";
+    dataAtIdxReady(idx);
+}
+
+function dataAtIdxReady(idx) {
+    itemsLoaded++;
+    if (idx == lastEpisodeIdxLoaded + 1) {
+        var i;
+        for (i = idx; fileList[i] && fileList[i].data; ++i) {
+            if (fileList[i].data != "failed") {
+                episodes.push(fileList[i].data);
+            }
+            lastEpisodeIdxLoaded = i;
+        }
+    }
+    rerender();
+}
+
+function addFile(name, filepath, idx) {
+    var xhr = new XMLHttpRequest();
+    xhr.addEventListener("load", function() {
+        episodeFileLoaded(name, filepath, idx, xhr.response);
+    });
+    xhr.addEventListener("error", function() {
+        episodeFileFailed(name, filepath, idx);
+    });
+    xhr.open("GET", filepath);
+    xhr.setRequestHeader("Content-Type", "text/plain");
+    xhr.send();
+}
+
+var script = document.createElement("SCRIPT");
+script.setAttribute("src", "https://api.github.com/repos/HandmadeCompanion/HandmadeCompanion/contents/src/documents/videos/code?callback=fileListLoaded");
+document.body.appendChild(script);
+
+var script = document.createElement("SCRIPT");
+script.setAttribute("src", "https://api.github.com/repos/HandmadeCompanion/HandmadeCompanion/contents/src/documents/videos/chat?callback=fileListLoaded");
+document.body.appendChild(script);
+
+var script = document.createElement("SCRIPT");
+script.setAttribute("src", "https://api.github.com/repos/HandmadeCompanion/HandmadeCompanion/contents/src/documents/videos/misc?callback=fileListLoaded");
+document.body.appendChild(script);
+
+</script>
+</body>
+</html>
