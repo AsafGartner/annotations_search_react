@@ -221,34 +221,35 @@ class Result extends React.Component {
         super(props);
     }
 
-    render() {
-        function markerContent(query, marker) {
-            var content = [];
-            query.lastIndex = 0;
-            var cursor = 0;
-            var text = marker.text;
-            var result = null;
-            content.push(marker.prettyTime + " ");
-            while (result = query.exec(text)) {
-                if (result.index > cursor) {
-                    content.push(text.slice(cursor, result.index));
-                }
-                content.push(<b>{result[0]}</b>);
-                cursor = result.index + result[0].length;
+    markerContent(query, marker) {
+        var content = [];
+        query.lastIndex = 0;
+        var cursor = 0;
+        var text = marker.text;
+        var result = null;
+        content.push(marker.prettyTime + " ");
+        while (result = query.exec(text)) {
+            if (result.index > cursor) {
+                content.push(text.slice(cursor, result.index));
             }
-
-            if (cursor < text.length) {
-                content.push(text.slice(cursor, text.length));
-            }
-            return content;
+            content.push(<b>{result[0]}</b>);
+            cursor = result.index + result[0].length;
         }
+
+        if (cursor < text.length) {
+            content.push(text.slice(cursor, text.length));
+        }
+        return content;
+    }
+
+    render() {
         return (
             <div className="dayContainer">
                 <span className="dayName">{this.props.result.episode.day}: {this.props.result.episode.title}</span>
                 <div className="markerList">
                     {this.props.result.markers.map((marker) =>
                         <a key={this.props.result.episode.day + marker.totalTime} className="marker" target="_blank" href={"http://asafgartner.github.io/annotations_player/hmh.html#" + this.props.result.episode.filename + "#" + marker.totalTime}>
-                            {markerContent(this.props.result.query, marker)}
+                            {this.markerContent(this.props.result.query, marker)}
                         </a>
                     )}
                 </div>
