@@ -108,7 +108,7 @@ class App extends React.Component {
         super(props);
         this.handleQuery = this.handleQuery.bind(this);
         this.state = {
-            query: ''
+            query: props.query
         };
     }
 
@@ -159,7 +159,7 @@ class App extends React.Component {
                 }
                 <h2>Handmade Hero Annotations Search (with React)</h2>
                 <div className="queryContainer">
-                    <label>Query:</label> <input type="text" id="query" autoFocus onChange={this.handleQuery}></input>
+                    <label>Query:</label> <input type="text" id="query" value={this.state.query} autoFocus onChange={this.handleQuery}></input>
                 </div>
                 <SearchResults results={searchResults} />
             </div>
@@ -266,8 +266,16 @@ var episodes = [];
 var lastEpisodeIdxLoaded = 0;
 
 function rerender() {
+    var query = "";
+    if (location.hash && location.hash.length > 0) {
+        query = location.hash;
+        if (query[0] == "#") {
+            query = query.slice(1);
+        }
+        query = decodeURIComponent(query);
+    }
     ReactDOM.render(
-        <App numFilesToLoad={itemsToLoad} numFilesLoaded={itemsLoaded} episodes={episodes}/>,
+        <App numFilesToLoad={itemsToLoad} numFilesLoaded={itemsLoaded} episodes={episodes} query={query}/>,
         document.getElementById('root')
     );
 }
